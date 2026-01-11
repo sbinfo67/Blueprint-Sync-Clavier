@@ -1,8 +1,8 @@
 blueprint:
-  name: Sync Alarmo & Frient Keypad (No Code Option)
+  name: Sync Alarmo & Frient Keypad (Smart Validation)
   description: >
-    Synchronisation bidirectionnelle entre Alarmo et le clavier Frient KEYZB-110.
-    Gère l'affichage des états sur le clavier et permet l'armement sans code via option.
+    Synchronisation bidirectionnelle. 
+    Vérifie si Alarmo a accepté le code avant de confirmer au clavier (Succès = Vert, Code faux/Erreur capteur = Rouge).
   domain: automation
   input:
     alarm_panel:
@@ -12,13 +12,13 @@ blueprint:
         entity:
           domain: alarm_control_panel
     keypad_topic:
-      name: Topic MQTT de commande du clavier Zigbee2MQTT
-      description: "Le topic de base de votre clavier (ex: zigbee2mqtt/Clavier_Entree). Le script ajoutera '/set' automatiquement pour envoyer les commandes au clavier."
+      name: Topic MQTT de commande
+      description: "Ex: zigbee2mqtt/Clavier_Entree"
       selector:
         text:
     arm_without_code:
       name: Autoriser l'armement sans code
-      description: Si activé, presser 'Away' ou 'Home' armera l'alarme immédiatement sans demander de code. (Nécessite de décocher 'Code requis pour armer' dans Alarmo).
+      description: "Active l'armement immédiat sans code (Décocher 'Code requis' dans Alarmo)."
       default: false
       selector:
         boolean: {}
@@ -35,7 +35,6 @@ trigger:
     id: "keypad_action"
 
 variables:
-  # On définit les variables pour pouvoir les manipuler dans les templates
   keypad_topic: !input keypad_topic
   alarm_panel: !input alarm_panel
   arm_without_code: !input arm_without_code
@@ -43,7 +42,7 @@ variables:
 action:
   - choose:
       # ---------------------------------------------------------
-      # 1. ALARMO CHANGE D'ÉTAT -> ON MET À JOUR LES LEDS DU CLAVIER
+      # 1. ALARMO CHANGE D'ÉTAT -> MAJ LEDS
       # ---------------------------------------------------------
       - conditions:
           - condition: trigger
@@ -51,7 +50,6 @@ action:
         sequence:
           - service: mqtt.publish
             data:
-              # IMPORTANT: On ajoute /set ici pour que le clavier reçoive l'ordre
               topic: "{{ keypad_topic }}/set"
               payload: >
                 {% set state = trigger.to_state.state %}
@@ -65,7 +63,7 @@ action:
                 {% endif %}
 
       # ---------------------------------------------------------
-      # 2. ACTION SUR LE CLAVIER -> ON COMMANDE ALARMO
+      # 2. ACTION CLAVIER -> COMMANDE ALARME AVEC VÉRIFICATION
       # ---------------------------------------------------------
       - conditions:
           - condition: trigger
@@ -77,19 +75,14 @@ action:
               transaction: "{{ trigger.payload_json.action_transaction }}"
           
           - choose:
-              # CAS A : DEMANDE D'ARMEMENT (Avec gestion de l'option sans code)
+              # --- CAS A : ARMEMENT ---
               - conditions:
                   - condition: template
                     value_template: >
                       {{ action in ['arm_all_zones', 'arm_day_zones', 'arm_night_zones'] and 
                          (arm_without_code == true or code != '') }}
                 sequence:
-                  # On confirme au clavier qu'on a bien reçu la commande (évite le clignotement rouge)
-                  - service: mqtt.publish
-                    data:
-                      topic: "{{ keypad_topic }}/set"
-                      payload: "{\"arm_mode\": {\"transaction\": {{transaction}}, \"mode\": \"{{action}}\"}}"
-                  # On exécute l'action sur Alarmo
+                  # 1. On tente d'armer Alarmo
                   - service: >
                       {% if action == 'arm_all_zones' %} alarm_control_panel.alarm_arm_away
                       {% elif action == 'arm_day_zones' %} alarm_control_panel.alarm_arm_home
@@ -99,24 +92,71 @@ action:
                       entity_id: !input alarm_panel
                     data:
                       code: "{{ code }}"
+                  
+                  # 2. Petite pause pour laisser Alarmo réagir (0.5s est suffisant généralement)
+                  - delay: "00:00:00.5"
 
-              # CAS B : DEMANDE DE DÉSARMEMENT (Code toujours obligatoire)
+                  # 3. Vérification : Est-ce que ça a marché ?
+                  # On vérifie si l'alarme est passée en 'arming' (délai sortie) ou 'armed_...'
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ states(alarm_panel) in ['arming', 'armed_away', 'armed_home', 'armed_night'] }}"
+                        sequence:
+                          # SUCCÈS : On confirme au clavier
+                          - service: mqtt.publish
+                            data:
+                              topic: "{{ keypad_topic }}/set"
+                              payload: "{\"arm_mode\": {\"transaction\": {{transaction}}, \"mode\": \"{{action}}\"}}"
+                      
+                      # ÉCHEC (Code faux ou capteur ouvert)
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ true }}" # Action par défaut
+                        sequence:
+                          - service: mqtt.publish
+                            data:
+                              topic: "{{ keypad_topic }}/set"
+                              payload: "{\"arm_mode\": {\"transaction\": {{transaction}}, \"mode\": \"invalid_code\"}}"
+
+              # --- CAS B : DÉSARMEMENT ---
               - conditions:
                   - condition: template
                     value_template: "{{ action == 'disarm' and code != '' }}"
                 sequence:
-                  - service: mqtt.publish
-                    data:
-                      topic: "{{ keypad_topic }}/set"
-                      payload: "{\"arm_mode\": {\"transaction\": {{transaction}}, \"mode\": \"disarm\"}}"
+                  # 1. On tente de désarmer
                   - service: alarm_control_panel.alarm_disarm
                     target:
                       entity_id: !input alarm_panel
                     data:
                       code: "{{ code }}"
+                  
+                  # 2. Pause
+                  - delay: "00:00:00.5"
 
-              # CAS C : CODE INVALIDE OU ERREUR
-              # Si on reçoit une transaction mais qu'aucune condition précédente n'est remplie
+                  # 3. Vérification
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ is_state(alarm_panel, 'disarmed') }}"
+                        sequence:
+                          # SUCCÈS
+                          - service: mqtt.publish
+                            data:
+                              topic: "{{ keypad_topic }}/set"
+                              payload: "{\"arm_mode\": {\"transaction\": {{transaction}}, \"mode\": \"disarm\"}}"
+                      
+                      # ÉCHEC (Code faux)
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ true }}"
+                        sequence:
+                          - service: mqtt.publish
+                            data:
+                              topic: "{{ keypad_topic }}/set"
+                              payload: "{\"arm_mode\": {\"transaction\": {{transaction}}, \"mode\": \"invalid_code\"}}"
+
+              # --- CAS C : AUTRE (Code manquant ou erreur technique) ---
               - conditions:
                   - condition: template
                     value_template: "{{ transaction is defined }}"
