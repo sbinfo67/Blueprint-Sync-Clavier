@@ -5,6 +5,7 @@ Cette **blueprint** permet de relier un **clavier Zigbee2MQTT** (par exemple le 
 - **Synchronisation bidirectionnelle** : Les changements d'état de l'alarme depuis le panneau de contrôle sont reflétés sur le clavier et vice versa.
 - **Gestion de plusieurs codes PIN** : Autorise l'utilisation de plusieurs codes PIN pour armer ou désarmer le système d'alarme.
 - **Gestion des erreurs** : Envoie des notifications en cas de saisie d'un code PIN invalide et réinitialise le clavier pour éviter le blocage.
+- **Activer l'alarme sans code** : Mon rajout dans ce fork, permet de lancer l'alarme sans code.
 
 ## 📋 Configuration
 
@@ -19,7 +20,7 @@ Cette **blueprint** permet de relier un **clavier Zigbee2MQTT** (par exemple le 
 
 #### Automatiquement
 
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FHowmationFr%2FBlueprint-Sync-Clavier%2Fblob%2Fmain%2Fsync-clavier.yaml)
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fsbinfo67%2FBlueprint-Sync-Clavier%2Fblob%2Fmain%2Fsync-clavier.yaml)
 
 #### Manuellement
 
