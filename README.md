@@ -3,7 +3,7 @@ Cette **blueprint** permet de relier un **clavier Zigbee2MQTT** (par exemple le 
 ## 🛠️ Fonctionnalités
 
 - **Synchronisation bidirectionnelle** : Les changements d'état de l'alarme depuis le panneau de contrôle sont reflétés sur le clavier et vice versa.
-- **Gestion de plusieurs codes PIN** : Autorise l'utilisation de plusieurs codes PIN pour armer ou désarmer le système d'alarme.
+- **Gestion de plusieurs codes PIN** : Utilise les codes PIN définit dans Alarmo pour armer ou désarmer le système d'alarme.
 - **Gestion des erreurs** : Envoie des notifications en cas de saisie d'un code PIN invalide et réinitialise le clavier pour éviter le blocage.
 - **Activer l'alarme sans code** : Mon rajout dans ce fork, permet de lancer l'alarme sans code.
 
@@ -44,20 +44,6 @@ Cette **blueprint** permet de relier un **clavier Zigbee2MQTT** (par exemple le 
    - **Topic MQTT d'état du clavier Zigbee2MQTT** :
      - Exemple : `zigbee2mqtt/Clavier`
    
-   - **Topic MQTT de commande du clavier Zigbee2MQTT** :
-     - Exemple : `zigbee2mqtt/Clavier/set`
-   
-   - **Codes PIN** :
-     - **Description** : Liste des codes PIN valides pour contrôler le système d'alarme.
-     - **Format** : Entrez chaque code PIN sur une nouvelle ligne.
-     - **Exemple** :
-       ```
-       1111
-       5555
-       8888
-       ```
-     - **Note** : Assurez-vous que chaque code PIN est correct et correspond à ceux configurés dans votre panneau d'alarme (Alarmo).
-   
    - **Panneau de contrôle d'alarme** :
      - Sélectionnez votre entité Alarmo, par exemple `alarm_control_panel.maison`.
 
@@ -88,8 +74,6 @@ Cette **blueprint** permet de relier un **clavier Zigbee2MQTT** (par exemple le 
      - Utilisez un client MQTT (comme [MQTT Explorer](https://mqtt-explorer.com/)) pour surveiller les messages publiés et reçus sur les topics `mqtt_topic_etat_clavier` et `mqtt_topic_commande_clavier`.
 
 2. **Les actions du clavier ne modifient pas l'état de l'alarme** :
-   - **Confirmez les Codes PIN** :
-     - Assurez-vous que le code PIN saisi correspond à l'un des codes définis dans la liste `code_pins`.
    - **Vérifiez les Permissions** :
      - Assurez-vous que Home Assistant a les permissions nécessaires pour publier sur les topics MQTT.
    - **Consultez les Logs** :
